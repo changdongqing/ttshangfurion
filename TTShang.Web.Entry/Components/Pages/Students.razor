@@ -1,0 +1,153 @@
+@page "/students"
+@using TTShang.Core.Entities
+@using TTShang.Application.Services
+@inject IStudentService StudentService
+@rendermode InteractiveServer
+
+<PageTitle>Students</PageTitle>
+
+<h1>Student Management</h1>
+
+<div style="margin-bottom: 16px;">
+    <Button Type="@ButtonType.Primary" OnClick="ShowAddModal">
+        Add Student
+    </Button>
+</div>
+
+<Table TItem="Student" DataSource="@students" Loading="@loading" @ref="table">
+    <Column Title="ID" TData="Guid" DataIndex="@nameof(Student.Id)" />
+    <Column Title="Name" TData="string" DataIndex="@nameof(Student.Name)" />
+    <Column Title="Age" TData="int" DataIndex="@nameof(Student.Age)" />
+    <Column Title="Gender" TData="string" DataIndex="@nameof(Student.Gender)" />
+    <ActionColumn Title="Actions">
+        <Space>
+            <SpaceItem>
+                <Button Type="@ButtonType.Primary" Size="@ButtonSize.Small" OnClick="() => ShowEditModal(context)">
+                    Edit
+                </Button>
+            </SpaceItem>
+            <SpaceItem>
+                <Popconfirm Title="Are you sure you want to delete this student?"
+                            OnConfirm="() => DeleteStudent(context.Id)"
+                            OkText="Yes"
+                            CancelText="No">
+                    <Button Danger Size="@ButtonSize.Small">
+                        Delete
+                    </Button>
+                </Popconfirm>
+            </SpaceItem>
+        </Space>
+    </ActionColumn>
+</Table>
+
+<Modal Title="@modalTitle"
+       @bind-Visible="@modalVisible"
+       OnOk="@HandleOkAsync"
+       OnCancel="@HandleCancelAsync">
+    <Form Model="@currentStudent" LabelColSpan="8" WrapperColSpan="16">
+        <FormItem Label="Name">
+            <Input @bind-Value="@currentStudent.Name" />
+        </FormItem>
+        <FormItem Label="Age">
+            <AntDesign.InputNumber @bind-Value="@currentStudent.Age" Min="1" Max="150" />
+        </FormItem>
+        <FormItem Label="Gender">
+            <Select TItemValue="string" TItem="string" @bind-Value="@currentStudent.Gender" Style="width: 100%;">
+                <SelectOption TItemValue="string" TItem="string" Value="@("Male")" Label="Male" />
+                <SelectOption TItemValue="string" TItem="string" Value="@("Female")" Label="Female" />
+                <SelectOption TItemValue="string" TItem="string" Value="@("Other")" Label="Other" />
+            </Select>
+        </FormItem>
+    </Form>
+</Modal>
+
+@code {
+    private List<Student> students = new();
+    private bool loading = true;
+    private bool modalVisible = false;
+    private string modalTitle = "Add Student";
+    private Student currentStudent = new();
+    private bool isEdit = false;
+    private Table<Student>? table;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStudents();
+    }
+
+    private async Task LoadStudents()
+    {
+        loading = true;
+        try
+        {
+            students = await StudentService.GetAllAsync();
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void ShowAddModal()
+    {
+        modalTitle = "Add Student";
+        currentStudent = new Student();
+        isEdit = false;
+        modalVisible = true;
+    }
+
+    private void ShowEditModal(Student student)
+    {
+        modalTitle = "Edit Student";
+        currentStudent = new Student
+        {
+            Id = student.Id,
+            Name = student.Name,
+            Age = student.Age,
+            Gender = student.Gender
+        };
+        isEdit = true;
+        modalVisible = true;
+    }
+
+    private async Task HandleOkAsync(MouseEventArgs args)
+    {
+        try
+        {
+            if (isEdit)
+            {
+                await StudentService.UpdateAsync(currentStudent);
+            }
+            else
+            {
+                await StudentService.AddAsync(currentStudent);
+            }
+
+            modalVisible = false;
+            await LoadStudents();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving student: {ex.Message}");
+        }
+    }
+
+    private async Task HandleCancelAsync(MouseEventArgs args)
+    {
+        modalVisible = false;
+        await Task.CompletedTask;
+    }
+
+    private async Task DeleteStudent(Guid id)
+    {
+        try
+        {
+            await StudentService.DeleteAsync(id);
+            await LoadStudents();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting student: {ex.Message}");
+        }
+    }
+}
